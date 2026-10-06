@@ -5,13 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#2B3A36" />
   <title>Parkly — Gestione Parchi</title>
+
+  <!-- PWA -->
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%232B3A36'/%3E%3Ctext x='50' y='66' font-size='56' text-anchor='middle' fill='%23F4EEE0' font-family='sans-serif' font-weight='700'%3EP%3C/text%3E%3C/svg%3E" />
 
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
+  <!-- Leaflet (mappa) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- React + Supabase -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
   <style>
     *, *::before, *::after { box-sizing: border-box; }
@@ -26,103 +40,79 @@
     button { -webkit-tap-highlight-color: transparent; }
     input, textarea { -webkit-appearance: none; appearance: none; }
     input[type="file"] { display: none; }
-    @keyframes fadeIn  { from { opacity: 0 } to { opacity: 1 } }
-    @keyframes slideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
+
+    /* Animations */
+    @keyframes fadeIn  { from {opacity:0} to {opacity:1} }
+    @keyframes slideUp { from {transform:translateY(100%)} to {transform:translateY(0)} }
     @keyframes spin    { to { transform: rotate(360deg); } }
-    @keyframes shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+    @keyframes pulse   { 0%,100% { opacity: 1 } 50% { opacity: 0.5 } }
+
     .spinner {
-      display: inline-block; width: 20px; height: 20px;
-      border: 3px solid rgba(43,58,54,0.15); border-top-color: currentColor;
-      border-radius: 50%; animation: spin 0.7s linear infinite;
+      display: inline-block;
+      width: 20px; height: 20px;
+      border: 3px solid rgba(43,58,54,0.15);
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
     }
+
+    .skeleton {
+      background: linear-gradient(90deg, rgba(217,207,184,0.4) 25%, rgba(217,207,184,0.7) 50%, rgba(217,207,184,0.4) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 8px;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+
+    /* Scrollbar */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: rgba(43,58,54,0.15); border-radius: 3px; }
-    .leaflet-container { font-family: 'Inter', sans-serif; background: #F4EEE0; }
-    .leaflet-popup-content-wrapper { border-radius: 12px; box-shadow: 0 8px 24px rgba(43,58,54,0.18); }
+
+    /* Leaflet override */
+    .leaflet-container {
+      font-family: 'Inter', sans-serif;
+      background: #F4EEE0;
+    }
+    .leaflet-popup-content-wrapper {
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(43,58,54,0.18);
+    }
+
+    /* Toast */
     .toast {
       position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
       background: #2B3A36; color: #F4EEE0;
       padding: 12px 18px; border-radius: 12px;
       font-size: 14px; font-weight: 600;
       z-index: 9999; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-      animation: fadeIn 0.2s ease; max-width: 90%;
+      animation: fadeIn 0.2s ease;
+      max-width: 90%;
     }
-    .toast.error   { background: #B0432B; }
+    .toast.error  { background: #B0432B; }
     .toast.success { background: #5C7A6F; }
-
-    /* Schermata di errore */
-    #fatal-error {
-      position: fixed; inset: 0; background: #2B3A36; color: #F4EEE0;
-      display: none; align-items: center; justify-content: center;
-      padding: 24px; font-family: 'Outfit', sans-serif;
-    }
-    #fatal-error.show { display: flex; }
-    #fatal-error .box {
-      max-width: 480px; width: 100%; background: rgba(244,238,224,0.06);
-      border: 1px solid rgba(244,238,224,0.14); border-radius: 16px; padding: 24px;
-    }
-    #fatal-error h1 { font-size: 20px; margin: 0 0 10px; color: #C46B3F; }
-    #fatal-error p { font-size: 13px; line-height: 1.55; opacity: 0.85; margin: 6px 0; }
-    #fatal-error code {
-      display: block; background: rgba(0,0,0,0.25); padding: 10px 12px;
-      border-radius: 8px; font-size: 12px; word-break: break-all; margin-top: 10px;
-    }
-    #fatal-error button {
-      margin-top: 16px; padding: 10px 18px; border-radius: 10px; border: none;
-      background: #C46B3F; color: #fff; font-weight: 700; cursor: pointer;
-      font-family: inherit;
-    }
   </style>
 </head>
 <body>
   <div id="root">
-    <div style="height:100vh;display:flex;align-items:center;justify-content:center;background:#F4EEE0;color:#2B3A36;font-family:'Outfit',sans-serif;">
+    <div style="height:100vh; display:flex; align-items:center; justify-content:center; background:#F4EEE0; color:#2B3A36; font-family:'Outfit',sans-serif;">
       <div style="text-align:center;">
-        <div style="font-size:48px;font-weight:800;letter-spacing:-0.04em;margin-bottom:8px;">Parkly</div>
-        <div style="font-size:14px;color:#6E6A5E;">Caricamento…</div>
+        <div style="font-size:48px; font-weight:800; letter-spacing:-0.04em; margin-bottom:8px;">Parkly</div>
+        <div style="font-size:14px; color:#6E6A5E;">Caricamento…</div>
       </div>
     </div>
   </div>
 
-  <!-- Schermata di errore visibile in caso di crash JS -->
-  <div id="fatal-error">
-    <div class="box">
-      <h1>Errore di caricamento</h1>
-      <p>L'app non è riuscita a partire. Dettaglio:</p>
-      <code id="fatal-error-msg">…</code>
-      <p style="margin-top:14px;opacity:0.6;font-size:11px;">Se il problema persiste, ricarica la pagina o controlla la connessione.</p>
-      <button onclick="location.reload()">Ricarica</button>
-    </div>
-  </div>
-
-  <!-- Cattura errori JS prima ancora di caricare le librerie -->
+  <!-- App config -->
   <script>
-    window.addEventListener('error', function(e) {
-      var msg = (e.error && e.error.message) || e.message || 'Errore sconosciuto';
-      var el = document.getElementById('fatal-error-msg');
-      var fe = document.getElementById('fatal-error');
-      if (el) el.textContent = msg;
-      if (fe) fe.classList.add('show');
-    });
     window.PARKLY_CONFIG = {
       SUPABASE_URL: 'https://mobefattfjxtmqgflzts.supabase.co',
-      SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vYmVmYXR0Zmp4dG1xZ2ZsenRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzA2MTQsImV4cCI6MjA5Mzg0NjYxNH0.D7dwZDgcaKtDLaiq9YZJuWgHzHjHWK6HKI49AhJjImQ'
+      SUPABASE_ANON_KEY: 'sb_publishable_-MVBpbDy2-W_C4Nhtw1Zvw_lVIW9V9F'
     };
   </script>
 
-  <!-- Librerie esterne (caricamento sincrono per garantire l'ordine) -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
-  <!-- App pre-compilata, completamente inline -->
+  <!-- App code -->
   <script>
-"use strict";
-
 /* ══════════════════════════════════════════════════════════
    PARKLY — Gestione Parchi
    App single-file con Supabase backend
@@ -206,6 +196,77 @@ const formatDateInput = d => {
   const date = typeof d === "string" ? new Date(d) : d;
   if (isNaN(date)) return "";
   return date.toISOString().split("T")[0];
+};
+
+/* ── STORAGE (bucket parkly-foto) ────────────────────── */
+const BUCKET = "parkly-foto";
+
+// Ricava il path interno al bucket da una public URL. null se non riconosciuta.
+const storagePathFromUrl = url => {
+  try {
+    const marker = `/${BUCKET}/`;
+    const idx = new URL(url).pathname.indexOf(marker);
+    return idx >= 0 ? decodeURIComponent(new URL(url).pathname.slice(idx + marker.length)) : null;
+  } catch (_) {
+    return null;
+  }
+};
+
+// Carica un file e restituisce la public URL. Lancia in caso di errore.
+const uploadFoto = async (file, folder = "general") => {
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const {
+    error
+  } = await sb.storage.from(BUCKET).upload(path, file, {
+    upsert: false,
+    contentType: file.type
+  });
+  if (error) throw error;
+  return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+};
+
+// Cancella una o più foto dal bucket a partire dalle public URL. Non lancia mai.
+const deleteFoto = async urls => {
+  const paths = (Array.isArray(urls) ? urls : [urls]).map(storagePathFromUrl).filter(Boolean);
+  if (paths.length === 0) return;
+  try {
+    await sb.storage.from(BUCKET).remove(paths);
+  } catch (e) {
+    console.warn("[Parkly] delete foto:", e);
+  }
+};
+
+/* ── STILE STATI (unica fonte di verità) ─────────────── */
+// stato: "pass" | "warning" | "fail" | null
+const statoStyle = stato => ({
+  pass: {
+    color: T.passColor,
+    bg: T.passBg,
+    label: "Conforme",
+    short: "Conforme",
+    icon: "✓"
+  },
+  warning: {
+    color: T.warnColor,
+    bg: T.warnBg,
+    label: "Da monitorare",
+    short: "Da monitorare",
+    icon: "!"
+  },
+  fail: {
+    color: T.failColor,
+    bg: T.failBg,
+    label: "Non conforme",
+    short: "Non conforme",
+    icon: "✗"
+  }
+})[stato] || {
+  color: T.textMuted,
+  bg: T.surfaceAlt,
+  label: "Da ispezionare",
+  short: "—",
+  icon: "◌"
 };
 const calcStatoGioco = (risposte, checklist) => {
   if (!risposte || !checklist) return null;
@@ -346,7 +407,7 @@ const LightboxHost = () => {
       alignItems: "center",
       justifyContent: "center"
     }
-  }, "\xD7"), /*#__PURE__*/React.createElement("a", {
+  }, "×"), /*#__PURE__*/React.createElement("a", {
     href: imgSrc,
     target: "_blank",
     rel: "noopener noreferrer",
@@ -366,7 +427,7 @@ const LightboxHost = () => {
       textDecoration: "none",
       fontFamily: "\'Outfit\', sans-serif"
     }
-  }, "\u2193 Apri"));
+  }, "↓ Apri"));
 };
 
 /* ══════════════════════════════════════════════════════
@@ -404,7 +465,7 @@ const setCookie = (name, value, days) => {
 };
 const getCookie = name => {
   try {
-    const m = document.cookie.match(new RegExp("(^|;)\\s*" + name + "=([^;]+)"));
+    const m = document.cookie.match(new RegExp("(^|;)\s*" + name + "=([^;]+)"));
     return m ? decodeURIComponent(m[2]) : null;
   } catch (_) {
     return null;
@@ -683,24 +744,9 @@ const StatusBadge = ({
   size = "sm"
 }) => {
   const cfg = {
-    pass: {
-      label: "Conforme",
-      color: T.passColor,
-      bg: T.passBg,
-      icon: "✓"
-    },
-    warning: {
-      label: "Da monitorare",
-      color: T.warnColor,
-      bg: T.warnBg,
-      icon: "!"
-    },
-    fail: {
-      label: "Non conforme",
-      color: T.failColor,
-      bg: T.failBg,
-      icon: "✗"
-    },
+    pass: statoStyle("pass"),
+    warning: statoStyle("warning"),
+    fail: statoStyle("fail"),
     attivo: {
       label: "Attivo",
       color: T.passColor,
@@ -822,7 +868,7 @@ const Header = ({
     justifyContent: "center",
     flexShrink: 0
   }
-}, "\u2039"), /*#__PURE__*/React.createElement("div", {
+}, "‹"), /*#__PURE__*/React.createElement("div", {
   style: {
     flex: 1,
     minWidth: 0
@@ -915,7 +961,7 @@ const SearchBar = ({
       fontSize: 14,
       color: t.textMuted
     }
-  }, "\u2315"), /*#__PURE__*/React.createElement("input", {
+  }, "⌕"), /*#__PURE__*/React.createElement("input", {
     value: value,
     onChange: e => onChange(e.target.value),
     placeholder: placeholder,
@@ -1582,24 +1628,10 @@ const PhotoPicker = ({
     if (!file) return;
     setUploading(true);
     try {
-      const ext = file.name.split(".").pop().toLowerCase();
-      const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const {
-        error
-      } = await sb.storage.from("parkly-foto").upload(path, file, {
-        upsert: false,
-        contentType: file.type
-      });
-      if (error) throw error;
-      const {
-        data: {
-          publicUrl
-        }
-      } = sb.storage.from("parkly-foto").getPublicUrl(path);
-      onChange(publicUrl);
+      onChange(await uploadFoto(file, folder));
       showToast("Foto caricata", "success");
     } catch (e) {
-      console.error(e);
+      console.error("[Parkly] upload:", e);
       showToast("Errore caricamento foto", "error");
     } finally {
       setUploading(false);
@@ -1607,14 +1639,7 @@ const PhotoPicker = ({
   };
   const handleDelete = async () => {
     if (!value) return;
-    try {
-      const url = new URL(value);
-      const idx = url.pathname.indexOf("/parkly-foto/");
-      if (idx >= 0) {
-        const path = decodeURIComponent(url.pathname.slice(idx + "/parkly-foto/".length));
-        await sb.storage.from("parkly-foto").remove([path]);
-      }
-    } catch (_) {/* ignore */}
+    await deleteFoto(value);
     onChange(null);
   };
   return /*#__PURE__*/React.createElement("div", null, label && /*#__PURE__*/React.createElement("div", {
@@ -1669,7 +1694,7 @@ const PhotoPicker = ({
       cursor: "pointer",
       color: T.text
     }
-  }, "\u21BB Cambia"), /*#__PURE__*/React.createElement("button", {
+  }, "↻ Cambia"), /*#__PURE__*/React.createElement("button", {
     onClick: handleDelete,
     style: {
       background: "rgba(176,67,43,0.92)",
@@ -1681,7 +1706,7 @@ const PhotoPicker = ({
       fontWeight: 600,
       cursor: "pointer"
     }
-  }, "\xD7"))) : /*#__PURE__*/React.createElement("button", {
+  }, "×"))) : /*#__PURE__*/React.createElement("button", {
     onClick: () => inputRef.current?.click(),
     disabled: uploading,
     style: {
@@ -1707,7 +1732,7 @@ const PhotoPicker = ({
     style: {
       fontSize: 28
     }
-  }, "\uD83D\uDCF7"), /*#__PURE__*/React.createElement("span", {
+  }, "📷"), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 13,
       fontWeight: 600
@@ -1881,7 +1906,7 @@ const LoginScreen = () => {
       fontSize: 13,
       fontWeight: 600
     }
-  }, "\u26A0 ", error), /*#__PURE__*/React.createElement("button", {
+  }, "⚠ ", error), /*#__PURE__*/React.createElement("button", {
     type: "submit",
     disabled: loading || !email || !password,
     style: {
@@ -2016,8 +2041,6 @@ const Dashboard = ({
     kind: "gioco",
     item: g
   }))].slice(0, 8) : [];
-  const quickLinks = []; // Rimossi: duplicati del menu principale
-
   return /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
@@ -2103,7 +2126,7 @@ const Dashboard = ({
   }, /*#__PURE__*/React.createElement(SearchBar, {
     value: search,
     onChange: setSearch,
-    placeholder: "Cerca\u2026",
+    placeholder: "Cerca…",
     theme: {
       surface: "rgba(255,255,255,0.16)",
       border: "rgba(255,255,255,0.22)",
@@ -2228,7 +2251,7 @@ const Dashboard = ({
       marginTop: 22
     }
   }, /*#__PURE__*/React.createElement(SectionTitle, {
-    title: "\u2691 Ispezioni del mese",
+    title: "⚑ Ispezioni del mese",
     sub: `${MESI_LUNGHI[meseCorrente]} ${annoCorrente} · ${giàFatte.length}/${comuniPianificati.length} completate`
   }), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2268,7 +2291,7 @@ const Dashboard = ({
         fontWeight: 700,
         flexShrink: 0
       }
-    }, "\u2302"), /*#__PURE__*/React.createElement("div", {
+    }, "⌂"), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -2285,7 +2308,7 @@ const Dashboard = ({
         color: T.textMuted,
         marginTop: 2
       }
-    }, np, " parchi \xB7 ", ng, " giochi")), /*#__PURE__*/React.createElement("span", {
+    }, np, " parchi · ", ng, " giochi")), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 12,
         color: T.accent,
@@ -2294,7 +2317,7 @@ const Dashboard = ({
         padding: "5px 10px",
         borderRadius: 8
       }
-    }, "Avvia \u2192"));
+    }, "Avvia →"));
   }), inCorso.map(c => {
     const np = db.parchi.filter(p => p.comune_id === c.id).length;
     return /*#__PURE__*/React.createElement("div", {
@@ -2326,7 +2349,7 @@ const Dashboard = ({
         fontWeight: 700,
         flexShrink: 0
       }
-    }, "\u25D4"), /*#__PURE__*/React.createElement("div", {
+    }, "◔"), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -2344,7 +2367,7 @@ const Dashboard = ({
         fontWeight: 600,
         marginTop: 2
       }
-    }, "In corso \xB7 ", np, " parchi")), /*#__PURE__*/React.createElement("span", {
+    }, "In corso · ", np, " parchi")), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 12,
         color: T.warnColor,
@@ -2353,7 +2376,7 @@ const Dashboard = ({
         padding: "5px 10px",
         borderRadius: 8
       }
-    }, "Riprendi \u2192"));
+    }, "Riprendi →"));
   }), giàFatte.map(c => {
     const isp = ispMese(c.id);
     return /*#__PURE__*/React.createElement("div", {
@@ -2383,7 +2406,7 @@ const Dashboard = ({
         fontWeight: 700,
         flexShrink: 0
       }
-    }, "\u2713"), /*#__PURE__*/React.createElement("div", {
+    }, "✓"), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -2410,13 +2433,13 @@ const Dashboard = ({
         padding: "5px 10px",
         borderRadius: 8
       }
-    }, "\u2713 Fatta"));
+    }, "✓ Fatta"));
   }))), contrattiInScadenza.length > 0 && !isComune && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 22
     }
   }, /*#__PURE__*/React.createElement(SectionTitle, {
-    title: "\u25F7 Contratti in scadenza",
+    title: "◷ Contratti in scadenza",
     sub: "Prossimi 3 mesi"
   }), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2442,7 +2465,7 @@ const Dashboard = ({
       fontSize: 18,
       color: T.warnColor
     }
-  }, "\u25F7"), /*#__PURE__*/React.createElement("div", {
+  }, "◷"), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
     }
@@ -2505,7 +2528,7 @@ const ListaComuni = ({
   }, /*#__PURE__*/React.createElement(SearchBar, {
     value: search,
     onChange: setSearch,
-    placeholder: "Cerca comune\u2026"
+    placeholder: "Cerca comune…"
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -2548,7 +2571,7 @@ const ListaComuni = ({
       gap: 10
     }
   }, filtered.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
-    icon: "\u25CC",
+    icon: "◌",
     title: "Nessun comune trovato",
     sub: "Prova a modificare la ricerca o i filtri."
   }) : filtered.map(c => {
@@ -2588,7 +2611,7 @@ const ListaComuni = ({
         fontWeight: 700,
         flexShrink: 0
       }
-    }, "\u2302"), /*#__PURE__*/React.createElement("div", {
+    }, "⌂"), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -2653,18 +2676,18 @@ const ListaComuni = ({
         fontSize: 11,
         color: T.textMuted
       }
-    }, "\u2740 ", np), /*#__PURE__*/React.createElement("span", {
+    }, "❀ ", np), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
         color: T.textMuted
       }
-    }, "\u25C9 ", totG), /*#__PURE__*/React.createElement("span", {
+    }, "◉ ", totG), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
         color: T.textMuted,
         marginLeft: "auto"
       }
-    }, "\u25F7 ", formatDate(c.scadenza)))));
+    }, "◷ ", formatDate(c.scadenza)))));
   })), isAdmin && /*#__PURE__*/React.createElement(FAB, {
     onClick: () => setShowAdd(true),
     label: "Aggiungi comune"
@@ -2743,7 +2766,7 @@ const ComuneForm = ({
       ...f,
       nome: v
     })),
-    placeholder: "Comune di\u2026"
+    placeholder: "Comune di…"
   })), /*#__PURE__*/React.createElement(Field, {
     label: "Referente"
   }, /*#__PURE__*/React.createElement(Input, {
@@ -2767,7 +2790,7 @@ const ComuneForm = ({
       ...f,
       telefono: v
     })),
-    placeholder: "+39 \u2026"
+    placeholder: "+39 …"
   })), /*#__PURE__*/React.createElement(Field, {
     label: "Email"
   }, /*#__PURE__*/React.createElement(Input, {
@@ -2777,7 +2800,7 @@ const ComuneForm = ({
       ...f,
       email: v
     })),
-    placeholder: "email@\u2026"
+    placeholder: "email@…"
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
@@ -2842,7 +2865,7 @@ const ComuneForm = ({
       ...f,
       note: v
     })),
-    placeholder: "Note libere\u2026"
+    placeholder: "Note libere…"
   })));
 };
 
@@ -2975,7 +2998,7 @@ const MiniMappaComune = ({
         fontSize: 20,
         color: T.textMuted
       }
-    }, "\u25CE"), /*#__PURE__*/React.createElement("div", {
+    }, "◎"), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 12,
         color: T.textMuted
@@ -3056,7 +3079,7 @@ const DettaglioComune = ({
         fontSize: 13,
         fontWeight: 600
       }
-    }, "\u270E"))
+    }, "✎"))
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "14px 16px 8px"
@@ -3146,7 +3169,7 @@ const DettaglioComune = ({
           textAlign: "center",
           boxShadow: T.shadowSm
         }
-      }, "\u2713 Ispezione gi\xE0 completata questo mese"));
+      }, "✓ Ispezione già completata questo mese"));
     }
     if (ispCorr?.stato === "in_corso") {
       return /*#__PURE__*/React.createElement("div", {
@@ -3168,7 +3191,7 @@ const DettaglioComune = ({
           cursor: "pointer",
           boxShadow: T.shadowSm
         }
-      }, "\u25D4 Riprendi ispezione in corso"));
+      }, "◔ Riprendi ispezione in corso"));
     }
     return /*#__PURE__*/React.createElement("div", {
       style: {
@@ -3189,13 +3212,13 @@ const DettaglioComune = ({
         cursor: "pointer",
         boxShadow: T.shadowSm
       }
-    }, "\u2691 Avvia ispezione mensile"));
+    }, "⚑ Avvia ispezione mensile"));
   })(), parchi.length > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "6px 16px 0"
     }
   }, /*#__PURE__*/React.createElement(SectionTitle, {
-    title: "\u25CE Posizione parchi",
+    title: "◎ Posizione parchi",
     sub: `${parchi.filter(p => p.lat && p.lng).length} di ${parchi.length} geolocalizzati`
   }), /*#__PURE__*/React.createElement(MiniMappaComune, {
     parchi: parchi,
@@ -3214,7 +3237,7 @@ const DettaglioComune = ({
       gap: 8
     }
   }, parchi.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
-    icon: "\u2740",
+    icon: "❀",
     title: "Nessun parco registrato"
   }) : parchi.map(p => {
     const ng = db.giochi.filter(g => g.parco_id === p.id).length;
@@ -3256,7 +3279,7 @@ const DettaglioComune = ({
         fontWeight: 700,
         flexShrink: 0
       }
-    }, "\u2740"), /*#__PURE__*/React.createElement("div", {
+    }, "❀"), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -3273,7 +3296,7 @@ const DettaglioComune = ({
         color: T.textMuted,
         marginTop: 2
       }
-    }, ng, " giochi \xB7 ultima isp. ", formatDate(p.last_insp))), /*#__PURE__*/React.createElement(StatusBadge, {
+    }, ng, " giochi · ultima isp. ", formatDate(p.last_insp))), /*#__PURE__*/React.createElement(StatusBadge, {
       stato: p.stato,
       size: "xs"
     }));
@@ -3447,7 +3470,7 @@ const ParcoForm = ({
       ...f,
       nome: v
     })),
-    placeholder: "Parco di\u2026"
+    placeholder: "Parco di…"
   })), comuni && /*#__PURE__*/React.createElement(Field, {
     label: "Comune *"
   }, /*#__PURE__*/React.createElement(Select, {
@@ -3456,7 +3479,7 @@ const ParcoForm = ({
       ...f,
       comune_id: v
     })),
-    placeholder: "Seleziona\u2026",
+    placeholder: "Seleziona…",
     options: comuni.map(c => ({
       value: c.id,
       label: c.nome
@@ -3469,7 +3492,7 @@ const ParcoForm = ({
       ...f,
       indirizzo: v
     })),
-    placeholder: "Via, citt\xE0"
+    placeholder: "Via, città"
   })), /*#__PURE__*/React.createElement(Field, {
     label: "Coordinate GPS"
   }, /*#__PURE__*/React.createElement("div", {
@@ -3505,7 +3528,7 @@ const ParcoForm = ({
       fontWeight: 700,
       cursor: "pointer"
     }
-  }, "\uD83D\uDCCD"))), /*#__PURE__*/React.createElement(Field, {
+  }, "📍"))), /*#__PURE__*/React.createElement(Field, {
     label: "Note"
   }, /*#__PURE__*/React.createElement(Input, {
     multiline: true,
@@ -3569,7 +3592,7 @@ const DettaglioParco = ({
         fontSize: 13,
         fontWeight: 600
       }
-    }, "\u270E")
+    }, "✎")
   }), parco.foto_url && /*#__PURE__*/React.createElement("div", {
     style: {
       background: T.surfaceDark,
@@ -3614,7 +3637,7 @@ const DettaglioParco = ({
       fontSize: 11,
       color: T.textMuted
     }
-  }, "\uD83D\uDCCD ", parco.lat.toFixed(5), ", ", parco.lng.toFixed(5)), parco.note && /*#__PURE__*/React.createElement("div", {
+  }, "📍 ", parco.lat.toFixed(5), ", ", parco.lng.toFixed(5)), parco.note && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 10,
       padding: "10px 12px",
@@ -3636,7 +3659,7 @@ const DettaglioParco = ({
       gap: 8
     }
   }, giochi.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
-    icon: "\u25C9",
+    icon: "◉",
     title: "Nessun gioco registrato"
   }) : giochi.map(g => /*#__PURE__*/React.createElement("div", {
     key: g.id,
@@ -3676,7 +3699,7 @@ const DettaglioParco = ({
       fontWeight: 700,
       flexShrink: 0
     }
-  }, "\u25C9"), /*#__PURE__*/React.createElement("div", {
+  }, "◉"), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       minWidth: 0
@@ -3693,7 +3716,7 @@ const DettaglioParco = ({
       color: T.textMuted,
       marginTop: 2
     }
-  }, g.tipo, " \xB7 ", g.produttore, " ", g.anno && `· ${g.anno}`)), /*#__PURE__*/React.createElement(StatusBadge, {
+  }, g.tipo, " · ", g.produttore, " ", g.anno && `· ${g.anno}`)), /*#__PURE__*/React.createElement(StatusBadge, {
     stato: g.stato,
     size: "xs"
   }))), canEdit && /*#__PURE__*/React.createElement("button", {
@@ -3844,7 +3867,7 @@ const GiocoForm = ({
       ...f,
       tipo: v
     })),
-    placeholder: "\u2014",
+    placeholder: "—",
     options: TIPOLOGIE
   })), /*#__PURE__*/React.createElement(Field, {
     label: "Produttore"
@@ -3854,7 +3877,7 @@ const GiocoForm = ({
       ...f,
       produttore: v
     })),
-    placeholder: "\u2014",
+    placeholder: "—",
     options: PRODUTTORI
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3942,7 +3965,7 @@ const DettaglioGioco = ({
         fontSize: 13,
         fontWeight: 600
       }
-    }, "\u270E")
+    }, "✎")
   }), gioco.foto_url && /*#__PURE__*/React.createElement("div", {
     style: {
       background: T.surfaceDark,
@@ -4225,7 +4248,7 @@ const SessioneComune = ({
       style: {
         background: T.surface,
         borderRadius: T.radius,
-        border: `2px solid ${fatto ? (fatto === "fail" ? T.failColor : fatto === "warning" ? T.warnColor : T.passColor) + "55" : T.border}`,
+        border: `2px solid ${fatto ? statoStyle(fatto).color + "55" : T.border}`,
         overflow: "hidden"
       }
     }, /*#__PURE__*/React.createElement("div", {
@@ -4245,16 +4268,16 @@ const SessioneComune = ({
         width: 42,
         height: 42,
         borderRadius: 12,
-        background: fatto ? fatto === "fail" ? T.failBg : fatto === "warning" ? T.warnBg : T.passBg : T.primaryLight,
+        background: fatto ? statoStyle(fatto).bg : T.primaryLight,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         fontSize: 18,
         flexShrink: 0,
-        color: fatto ? fatto === "fail" ? T.failColor : fatto === "warning" ? T.warnColor : T.passColor : T.primary,
+        color: fatto ? statoStyle(fatto).color : T.primary,
         fontWeight: 700
       }
-    }, fatto ? fatto === "fail" ? "✗" : fatto === "warning" ? "!" : "✓" : "❀"), /*#__PURE__*/React.createElement("div", {
+    }, fatto ? statoStyle(fatto).icon : "❀"), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -4282,7 +4305,7 @@ const SessioneComune = ({
         padding: "5px 10px",
         borderRadius: 8
       }
-    }, "Ispeziona \u2192")), /*#__PURE__*/React.createElement("div", {
+    }, "Ispeziona →")), /*#__PURE__*/React.createElement("div", {
       onClick: openMaps,
       style: {
         borderTop: `1px solid ${T.border}`,
@@ -4297,7 +4320,7 @@ const SessioneComune = ({
       style: {
         fontSize: 15
       }
-    }, "\uD83D\uDCCD"), /*#__PURE__*/React.createElement("span", {
+    }, "📍"), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 12,
         fontWeight: 600,
@@ -4310,7 +4333,7 @@ const SessioneComune = ({
         color: T.primary,
         fontWeight: 700
       }
-    }, "Apri Maps \u2197")));
+    }, "Apri Maps ↗")));
   }), tuttiCompletati && /*#__PURE__*/React.createElement("button", {
     onClick: () => onNav("valutazione_comune", {
       comune,
@@ -4329,7 +4352,7 @@ const SessioneComune = ({
       fontSize: 14,
       cursor: "pointer"
     }
-  }, "\u2713 Concludi \u2014 Valutazione finale"), !tuttiCompletati && /*#__PURE__*/React.createElement("div", {
+  }, "✓ Concludi — Valutazione finale"), !tuttiCompletati && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 4,
       padding: "11px 14px",
@@ -4509,7 +4532,7 @@ const SessioneParco = ({
       style: {
         background: T.surface,
         borderRadius: T.radius,
-        border: `2px solid ${fatto ? (stato === "fail" ? T.failColor : stato === "warning" ? T.warnColor : T.passColor) + "55" : T.border}`,
+        border: `2px solid ${fatto ? statoStyle(stato).color + "55" : T.border}`,
         overflow: "hidden"
       }
     }, /*#__PURE__*/React.createElement("div", {
@@ -4555,7 +4578,7 @@ const SessioneParco = ({
         fontWeight: 700,
         flexShrink: 0
       }
-    }, "\u25C9"), /*#__PURE__*/React.createElement("div", {
+    }, "◉"), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -4581,7 +4604,7 @@ const SessioneParco = ({
         color: T.accent,
         fontWeight: 700
       }
-    }, "\u203A")), /*#__PURE__*/React.createElement("div", {
+    }, "›")), /*#__PURE__*/React.createElement("div", {
       onClick: () => setEditFotoGioco(g),
       style: {
         borderTop: `1px solid ${T.border}`,
@@ -4596,7 +4619,7 @@ const SessioneParco = ({
       style: {
         fontSize: 13
       }
-    }, "\uD83D\uDCF7"), /*#__PURE__*/React.createElement("span", {
+    }, "📷"), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
         fontWeight: 600,
@@ -4604,7 +4627,7 @@ const SessioneParco = ({
       }
     }, g.foto_url ? "Cambia foto principale" : "Aggiungi foto principale")));
   }), giochi.length === 0 && !loadingPC && /*#__PURE__*/React.createElement(Empty, {
-    icon: "\u25C9",
+    icon: "◉",
     title: "Nessun gioco",
     sub: "Aggiungi il primo gioco con il bottone sopra."
   })), showAddGioco && /*#__PURE__*/React.createElement(GiocoForm, {
@@ -4632,7 +4655,7 @@ const SessioneParco = ({
       fontSize: 11,
       color: T.textMuted
     }
-  }, "La foto viene aggiornata immediatamente nel database e sar\xE0 visibile nei report.")));
+  }, "La foto viene aggiornata immediatamente nel database e sarà visibile nei report.")));
 };
 
 /* ── CHECKLIST GIOCO con FOTO NC per ogni domanda ───── */
@@ -4647,21 +4670,7 @@ const FotoAdder = ({
     if (!file) return;
     setUploading(true);
     try {
-      const ext = file.name.split(".").pop().toLowerCase() || "jpg";
-      const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const {
-        error
-      } = await sb.storage.from("parkly-foto").upload(path, file, {
-        upsert: false,
-        contentType: file.type
-      });
-      if (error) throw error;
-      const {
-        data: {
-          publicUrl
-        }
-      } = sb.storage.from("parkly-foto").getPublicUrl(path);
-      onAdd(publicUrl);
+      onAdd(await uploadFoto(file, folder));
       showToast("Foto aggiunta", "success");
     } catch (e) {
       showToast("Errore caricamento: " + e.message, "error");
@@ -4701,7 +4710,7 @@ const FotoAdder = ({
       height: 14,
       color: "rgba(176,67,43,0.8)"
     }
-  }) : /*#__PURE__*/React.createElement("span", null, "\uD83D\uDCF7"), uploading ? "Caricamento…" : "+ Aggiungi foto"));
+  }) : /*#__PURE__*/React.createElement("span", null, "📷"), uploading ? "Caricamento…" : "+ Aggiungi foto"));
 };
 const ChecklistGioco = ({
   db,
@@ -4868,7 +4877,7 @@ const ChecklistGioco = ({
     }
   };
   if (!cur) return /*#__PURE__*/React.createElement(Empty, {
-    icon: "\u2713",
+    icon: "✓",
     title: "Nessuna domanda"
   });
   return /*#__PURE__*/React.createElement("div", {
@@ -4957,7 +4966,7 @@ const ChecklistGioco = ({
     style: {
       fontSize: 30
     }
-  }, "\u2713"), " S\xEC, conforme"), /*#__PURE__*/React.createElement("button", {
+  }, "✓"), " Sì, conforme"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setRisposta(false),
     style: {
       flex: 1,
@@ -4979,12 +4988,12 @@ const ChecklistGioco = ({
     style: {
       fontSize: 30
     }
-  }, "\u2717"), " Non conforme")) : cur.tipo === "text" ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Input, {
+  }, "✗"), " Non conforme")) : cur.tipo === "text" ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Input, {
     multiline: true,
     rows: 5,
     value: risposte[cur.id] === undefined ? "" : risposte[cur.id],
     onChange: v => setRisposta(v),
-    placeholder: "Inserisci la tua risposta o note\u2026"
+    placeholder: "Inserisci la tua risposta o note…"
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
@@ -4992,7 +5001,7 @@ const ChecklistGioco = ({
       marginTop: 6,
       fontStyle: "italic"
     }
-  }, "Risposta libera \u2014 puoi anche lasciare vuoto.")) : /*#__PURE__*/React.createElement("div", {
+  }, "Risposta libera — puoi anche lasciare vuoto.")) : /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -5023,7 +5032,7 @@ const ChecklistGioco = ({
         alignItems: "center",
         justifyContent: "space-between"
       }
-    }, /*#__PURE__*/React.createElement("span", null, opt), sel && /*#__PURE__*/React.createElement("span", null, "\u2713"));
+    }, /*#__PURE__*/React.createElement("span", null, opt), sel && /*#__PURE__*/React.createElement("span", null, "✓"));
   }))), isAnswered && isNonConforme && /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 14
@@ -5042,7 +5051,7 @@ const ChecklistGioco = ({
       textTransform: "uppercase",
       letterSpacing: "0.06em"
     }
-  }, "\u26A0 Documenta la non conformit\xE0 ", (foto[cur.id]?.length || 0) > 0 && `(${foto[cur.id].length} foto)`), (foto[cur.id] || []).map((f, i) => /*#__PURE__*/React.createElement("div", {
+  }, "⚠ Documenta la non conformità ", (foto[cur.id]?.length || 0) > 0 && `(${foto[cur.id].length} foto)`), (foto[cur.id] || []).map((f, i) => /*#__PURE__*/React.createElement("div", {
     key: f.tmpId,
     style: {
       marginBottom: 12,
@@ -5085,7 +5094,7 @@ const ChecklistGioco = ({
       justifyContent: "center",
       fontWeight: 700
     }
-  }, "\xD7"), /*#__PURE__*/React.createElement("div", {
+  }, "×"), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "absolute",
       top: 6,
@@ -5104,7 +5113,7 @@ const ChecklistGioco = ({
   }, /*#__PURE__*/React.createElement(Input, {
     multiline: true,
     rows: 2,
-    placeholder: "Descrizione (opzionale)\u2026",
+    placeholder: "Descrizione (opzionale)…",
     value: f.caption || "",
     onChange: v => setCaptionFoto(f.tmpId, v)
   })))), /*#__PURE__*/React.createElement(FotoAdder, {
@@ -5136,7 +5145,7 @@ const ChecklistGioco = ({
       fontWeight: 600,
       cursor: step === 0 ? "not-allowed" : "pointer"
     }
-  }, "\u2039 Indietro"), !isLastStep ? /*#__PURE__*/React.createElement("button", {
+  }, "‹ Indietro"), !isLastStep ? /*#__PURE__*/React.createElement("button", {
     onClick: next,
     disabled: !isAnswered,
     style: {
@@ -5151,7 +5160,7 @@ const ChecklistGioco = ({
       fontWeight: 700,
       cursor: isAnswered ? "pointer" : "not-allowed"
     }
-  }, "Avanti \u203A") : /*#__PURE__*/React.createElement("button", {
+  }, "Avanti ›") : /*#__PURE__*/React.createElement("button", {
     onClick: salva,
     disabled: !allAnswered || saving,
     style: {
@@ -5239,14 +5248,14 @@ const ValutazioneComune = ({
       color: T.text,
       marginBottom: 12
     }
-  }, "Stai per chiudere l'ispezione di ", /*#__PURE__*/React.createElement("strong", null, comune.nome), ". Una volta confermata, il report sar\xE0 visibile al comune."), /*#__PURE__*/React.createElement(Field, {
+  }, "Stai per chiudere l'ispezione di ", /*#__PURE__*/React.createElement("strong", null, comune.nome), ". Una volta confermata, il report sarà visibile al comune."), /*#__PURE__*/React.createElement(Field, {
     label: "Note finali (opzionali)"
   }, /*#__PURE__*/React.createElement(Input, {
     multiline: true,
     rows: 4,
     value: note,
     onChange: setNote,
-    placeholder: "Osservazioni generali sull'ispezione\u2026"
+    placeholder: "Osservazioni generali sull'ispezione…"
   }))), /*#__PURE__*/React.createElement("button", {
     onClick: concludi,
     disabled: saving,
@@ -5386,7 +5395,7 @@ const MappaParchi = ({
   }, /*#__PURE__*/React.createElement(SearchBar, {
     value: search,
     onChange: setSearch,
-    placeholder: "Cerca parco\u2026"
+    placeholder: "Cerca parco…"
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -5508,7 +5517,7 @@ const Calendario = ({
       color: T.text,
       fontWeight: 700
     }
-  }, "\u2039"), /*#__PURE__*/React.createElement("div", {
+  }, "‹"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 16,
       fontWeight: 700,
@@ -5528,7 +5537,7 @@ const Calendario = ({
       color: T.text,
       fontWeight: 700
     }
-  }, "\u203A")), /*#__PURE__*/React.createElement(SectionTitle, {
+  }, "›")), /*#__PURE__*/React.createElement(SectionTitle, {
     title: `${comuniMese.length} comuni in calendario`,
     sub: "Da ispezionare questo mese"
   }), /*#__PURE__*/React.createElement("div", {
@@ -5538,9 +5547,9 @@ const Calendario = ({
       gap: 8
     }
   }, comuniMese.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
-    icon: "\u25A6",
+    icon: "▦",
     title: "Nessuna ispezione",
-    sub: "Nessun comune \xE8 programmato per questo mese."
+    sub: "Nessun comune è programmato per questo mese."
   }) : comuniMese.map(c => {
     const np = db.parchi.filter(p => p.comune_id === c.id).length;
     const ng = db.giochi.filter(g => db.parchi.find(p => p.id === g.parco_id)?.comune_id === c.id).length;
@@ -5581,7 +5590,7 @@ const Calendario = ({
         fontWeight: 700,
         flexShrink: 0
       }
-    }, "\u2302"), /*#__PURE__*/React.createElement("div", {
+    }, "⌂"), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -5598,7 +5607,7 @@ const Calendario = ({
         color: T.textMuted,
         marginTop: 2
       }
-    }, np, " parchi \xB7 ", ng, " giochi")), /*#__PURE__*/React.createElement("span", {
+    }, np, " parchi · ", ng, " giochi")), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
         color: tagColor,
@@ -5683,7 +5692,7 @@ const ListaParchiComune = ({
   }, /*#__PURE__*/React.createElement(SearchBar, {
     value: search,
     onChange: setSearch,
-    placeholder: "Cerca parco\u2026"
+    placeholder: "Cerca parco…"
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "4px 16px 24px",
@@ -5692,7 +5701,7 @@ const ListaParchiComune = ({
       gap: 10
     }
   }, filtered.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
-    icon: "\u2740",
+    icon: "❀",
     title: "Nessun parco"
   }) : filtered.map(p => {
     const ng = db.giochi.filter(g => g.parco_id === p.id).length;
@@ -5734,7 +5743,7 @@ const ListaParchiComune = ({
         fontWeight: 700,
         flexShrink: 0
       }
-    }, "\u2740"), /*#__PURE__*/React.createElement("div", {
+    }, "❀"), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -5751,7 +5760,7 @@ const ListaParchiComune = ({
         color: T.textMuted,
         marginTop: 2
       }
-    }, ng, " giochi \xB7 ultima isp. ", formatDate(p.last_insp))), /*#__PURE__*/React.createElement(StatusBadge, {
+    }, ng, " giochi · ultima isp. ", formatDate(p.last_insp))), /*#__PURE__*/React.createElement(StatusBadge, {
       stato: p.stato,
       size: "xs"
     }));
@@ -5956,14 +5965,14 @@ const Profilo = ({
       fontSize: 14,
       color: T.textMuted
     }
-  }, "\u203A")))), /*#__PURE__*/React.createElement("div", {
+  }, "›")))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 24,
       textAlign: "center",
       fontSize: 11,
       color: T.textMuted
     }
-  }, "Parkly \xB7 v1.0 \xB7 Arcaland")), /*#__PURE__*/React.createElement(Modal, {
+  }, "Parkly · v1.0 · Arcaland")), /*#__PURE__*/React.createElement(Modal, {
     open: showPwd,
     onClose: () => setShowPwd(false),
     title: "Cambia password",
@@ -6000,7 +6009,7 @@ const Profilo = ({
       fontSize: 14,
       color: T.text
     }
-  }, "Verr\xE0 richiesto di rieffettuare l'accesso al prossimo utilizzo.")));
+  }, "Verrà richiesto di rieffettuare l'accesso al prossimo utilizzo.")));
 };
 
 /* ══════════════════════════════════════════════════════
@@ -6049,7 +6058,7 @@ const ListaReport = ({
   }, /*#__PURE__*/React.createElement(SearchBar, {
     value: search,
     onChange: setSearch,
-    placeholder: "Cerca per comune\u2026"
+    placeholder: "Cerca per comune…"
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "6px 16px 24px",
@@ -6058,7 +6067,7 @@ const ListaReport = ({
       gap: 10
     }
   }, filtered.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
-    icon: "\u2261",
+    icon: "≡",
     title: "Nessun report",
     sub: "I report appariranno qui dopo le ispezioni."
   }) : filtered.map(i => /*#__PURE__*/React.createElement("div", {
@@ -6089,7 +6098,7 @@ const ListaReport = ({
       fontWeight: 700,
       flexShrink: 0
     }
-  }, "\u2261"), /*#__PURE__*/React.createElement("div", {
+  }, "≡"), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       minWidth: 0
@@ -6106,17 +6115,541 @@ const ListaReport = ({
       color: T.textMuted,
       marginTop: 2
     }
-  }, formatDate(i.data), " \xB7 ", i.ispettore?.nome)), /*#__PURE__*/React.createElement("span", {
+  }, formatDate(i.data), " · ", i.ispettore?.nome)), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 14,
       color: T.textMuted
     }
-  }, "\u203A")))));
+  }, "›")))));
 };
 
 /* ══════════════════════════════════════════════════════
    DETTAGLIO REPORT + PDF
 ═══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════
+   GENERAZIONE PDF REPORT
+   Funzione pura: riceve i dati, restituisce { pdf, fname }.
+   Nessuna dipendenza da React o dallo stato del componente.
+   ══════════════════════════════════════════════════════ */
+const buildReportPDF = async (data, db) => {
+  const {
+    jsPDF
+  } = window.jspdf;
+  const pdf = new jsPDF({
+    unit: "pt",
+    format: "a4"
+  });
+  const W = pdf.internal.pageSize.getWidth();
+  const H = pdf.internal.pageSize.getHeight();
+  const M = 40;
+  const CW = W - 2 * M;
+  let y = M;
+  let pageNum = 1;
+
+  // ── Helpers ──────────────────────────────────────
+  const loadImg = async url => {
+    try {
+      const blob = await fetch(url).then(r => r.blob());
+      const dataUrl = await new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = () => res(fr.result);
+        fr.onerror = rej;
+        fr.readAsDataURL(blob);
+      });
+      return await new Promise(res => {
+        const img = new window.Image();
+        img.onload = () => res({
+          dataUrl,
+          w: img.naturalWidth || 800,
+          h: img.naturalHeight || 600
+        });
+        img.onerror = () => res({
+          dataUrl,
+          w: 800,
+          h: 600
+        });
+        img.src = dataUrl;
+      });
+    } catch (e) {
+      return null;
+    }
+  };
+  const fitImage = (img, maxW, maxH) => {
+    if (!img) return {
+      w: 0,
+      h: 0
+    };
+    const r = img.w / img.h;
+    let w = maxW,
+      h = maxW / r;
+    if (h > maxH) {
+      h = maxH;
+      w = maxH * r;
+    }
+    return {
+      w,
+      h
+    };
+  };
+  const txt = (s, x, yy, opts) => pdf.text(s, x, yy, opts);
+  const setT = (size, bold, rgb) => {
+    pdf.setFont("helvetica", bold ? "bold" : "normal");
+    pdf.setFontSize(size);
+    if (rgb) pdf.setTextColor(rgb[0], rgb[1], rgb[2]);
+  };
+  const rect = (x, yy, w, h, rgb, radius) => {
+    pdf.setFillColor(rgb[0], rgb[1], rgb[2]);
+    if (radius != null) pdf.roundedRect(x, yy, w, h, radius, radius, "F");else pdf.rect(x, yy, w, h, "F");
+  };
+  const stroke = (x, yy, w, h, rgb, lw, radius) => {
+    pdf.setDrawColor(rgb[0], rgb[1], rgb[2]);
+    pdf.setLineWidth(lw || 0.5);
+    if (radius != null) pdf.roundedRect(x, yy, w, h, radius, radius, "S");else pdf.rect(x, yy, w, h, "S");
+  };
+  const line = (x1, y1, x2, y2, rgb, lw, dash) => {
+    pdf.setDrawColor(rgb[0], rgb[1], rgb[2]);
+    pdf.setLineWidth(lw || 0.5);
+    if (dash) pdf.setLineDash(dash);
+    pdf.line(x1, y1, x2, y2);
+    if (dash) pdf.setLineDash([]);
+  };
+  // Disegna check ✓ a vettori centrato in (cx, cy)
+  const drawCheck = (cx, cy, size, rgb) => {
+    pdf.setDrawColor(rgb[0], rgb[1], rgb[2]);
+    pdf.setLineWidth(Math.max(1.1, size * 0.20));
+    pdf.setLineCap("round");
+    pdf.setLineJoin("round");
+    const s = size;
+    // Primo tratto: dal punto basso sinistra al vertice (basso)
+    pdf.line(cx + s * 0.10, cy - s * 0.05, cx + s * 0.38, cy + s * 0.22);
+    // Secondo tratto: dal vertice in alto a destra
+    pdf.line(cx + s * 0.38, cy + s * 0.22, cx + s * 0.92, cy - s * 0.35);
+    pdf.setLineCap("butt");
+    pdf.setLineJoin("miter");
+  };
+  // Disegna X a vettori centrata in (cx, cy)
+  const drawCross = (cx, cy, size, rgb) => {
+    pdf.setDrawColor(rgb[0], rgb[1], rgb[2]);
+    pdf.setLineWidth(Math.max(1.1, size * 0.20));
+    pdf.setLineCap("round");
+    const s = size;
+    pdf.line(cx + s * 0.15, cy - s * 0.32, cx + s * 0.82, cy + s * 0.32);
+    pdf.line(cx + s * 0.82, cy - s * 0.32, cx + s * 0.15, cy + s * 0.32);
+    pdf.setLineCap("butt");
+  };
+
+  // ── Palette ──────────────────────────────────────
+  const C = {
+    dark: [43, 58, 54],
+    text: [43, 42, 38],
+    muted: [110, 106, 94],
+    border: [217, 207, 184],
+    surface: [251, 247, 238],
+    surfaceAlt: [234, 223, 200],
+    bg: [244, 238, 224],
+    accent: [196, 107, 63],
+    pass: [92, 122, 111],
+    passBg: [215, 221, 201],
+    warn: [201, 148, 58],
+    warnBg: [243, 226, 183],
+    fail: [176, 67, 43],
+    failBg: [240, 207, 194]
+  };
+
+  // ── Footer / Pagina ──────────────────────────────
+  const writeFooter = () => {
+    setT(7.5, false, C.muted);
+    txt("Parkly · Report di ispezione parchi gioco", M, H - 24);
+    txt("Pagina " + pageNum, W - M, H - 24, {
+      align: "right"
+    });
+    line(M, H - 36, W - M, H - 36, C.border, 0.4);
+  };
+  const newPage = () => {
+    writeFooter();
+    pdf.addPage();
+    pageNum++;
+    y = M;
+  };
+
+  // ═════════════════════════════════════════════════
+  // PAGINA 1 — COPERTINA
+  // ═════════════════════════════════════════════════
+  rect(0, 0, W, 220, C.dark);
+  // Decorativi
+  pdf.setFillColor(196, 107, 63);
+  pdf.circle(W - 56, 56, 78, "F");
+  pdf.setFillColor(212, 145, 95);
+  pdf.circle(W - 110, 150, 32, "F");
+  pdf.setFillColor(C.dark[0], C.dark[1], C.dark[2]);
+  pdf.circle(W - 105, 50, 18, "F");
+  setT(42, true, [244, 238, 224]);
+  txt("Parkly", M, 92);
+  setT(11, false, [217, 207, 184]);
+  txt("Report di ispezione parchi gioco", M, 112);
+  setT(9, false, [180, 170, 150]);
+  txt("Conforme allo standard UNI EN 1176", M, 128);
+
+  // Card riepilogo (sovrapposta al hero)
+  const cY = 178,
+    cH = 130;
+  rect(M, cY, CW, cH, C.surface, 14);
+  stroke(M, cY, CW, cH, C.border, 0.8, 14);
+  setT(20, true, C.text);
+  txt(data.ispezione.comune?.nome || "—", M + 22, cY + 32);
+
+  // Pill verde (auto-width sul testo)
+  const pillStr = "ISPEZIONE COMPLETATA";
+  setT(7.5, true);
+  const pillW = pdf.getStringUnitWidth(pillStr) * 7.5 / pdf.internal.scaleFactor + 24;
+  rect(M + 22, cY + 42, pillW, 16, C.passBg, 8);
+  setT(7.5, true, C.pass);
+  txt(pillStr, M + 34, cY + 53);
+  // checkmark
+  pdf.setDrawColor(C.pass[0], C.pass[1], C.pass[2]);
+  pdf.setLineWidth(1.2);
+  pdf.line(M + 26, cY + 50.5, M + 28.5, cY + 53);
+  pdf.line(M + 28.5, cY + 53, M + 32, cY + 48.5);
+
+  // Info griglia: 3 colonne
+  const infoY = cY + 86;
+  const infoLabels = ["DATA ISPEZIONE", "TECNICO INCARICATO", "GENERATO IL"];
+  const infoValues = [formatDate(data.ispezione.data) || "—", data.ispezione.ispettore?.nome || "—", formatDate(new Date())];
+  const colW = (CW - 44) / 3;
+  infoLabels.forEach((lbl, i) => {
+    const x = M + 22 + i * colW;
+    setT(7.5, true, C.muted);
+    txt(lbl, x, infoY);
+    setT(11, true, C.text);
+    const v = infoValues[i];
+    txt(v.length > 26 ? v.slice(0, 24) + "…" : v, x, infoY + 16);
+  });
+
+  // Riepilogo numerico
+  y = cY + cH + 32;
+  setT(15, true, C.text);
+  txt("Riepilogo ispezione", M, y);
+  // Sottolineatura corta sotto il titolo
+  line(M, y + 5, M + 56, y + 5, C.accent, 2);
+  y += 22;
+  const tot = data.righe.length;
+  const conf = data.righe.filter(r => r.stato_calc === "pass").length;
+  const warn = data.righe.filter(r => r.stato_calc === "warning").length;
+  const ko = data.righe.filter(r => r.stato_calc === "fail").length;
+  const stats = [{
+    label: "TOTALE GIOCHI",
+    val: tot,
+    bg: C.surfaceAlt,
+    fg: C.text,
+    fgVal: C.dark
+  }, {
+    label: "CONFORMI",
+    val: conf,
+    bg: C.passBg,
+    fg: C.pass,
+    fgVal: C.pass
+  }, {
+    label: "DA MONITORARE",
+    val: warn,
+    bg: C.warnBg,
+    fg: C.warn,
+    fgVal: C.warn
+  }, {
+    label: "NON CONFORMI",
+    val: ko,
+    bg: C.failBg,
+    fg: C.fail,
+    fgVal: C.fail
+  }];
+  const swc = (CW - 24) / 4;
+  stats.forEach((s, i) => {
+    const x = M + i * (swc + 8);
+    rect(x, y, swc, 82, s.bg, 12);
+    setT(32, true, s.fgVal);
+    txt(String(s.val), x + 14, y + 44);
+    setT(7.5, true, s.fg);
+    txt(s.label, x + 14, y + 64);
+  });
+  y += 82 + 26;
+
+  // Note finali
+  if (data.ispezione.note_finali) {
+    if (y + 80 > H - 60) newPage();
+    setT(13, true, C.text);
+    txt("Note finali", M, y);
+    line(M, y + 4, M + 38, y + 4, C.accent, 2);
+    y += 16;
+    const lines = pdf.splitTextToSize(data.ispezione.note_finali, CW - 24);
+    const nh = lines.length * 14 + 22;
+    rect(M, y, CW, nh, C.surfaceAlt, 10);
+    setT(10, false, C.text);
+    txt(lines, M + 14, y + 18);
+    y += nh + 14;
+  }
+
+  // ═════════════════════════════════════════════════
+  // PAGINE GIOCHI — Layout magazine, 2+ per pagina
+  // ═════════════════════════════════════════════════
+  const perParco = {};
+  data.righe.forEach(r => {
+    const pid = r.gioco?.parco?.id || "_";
+    if (!perParco[pid]) perParco[pid] = {
+      parco: r.gioco?.parco,
+      righe: []
+    };
+    perParco[pid].righe.push(r);
+  });
+  const checklist = (db.checklist || []).slice().sort((a, b) => a.ordine - b.ordine);
+  const parcoIds = Object.keys(perParco).sort((a, b) => (perParco[a].parco?.nome || "").localeCompare(perParco[b].parco?.nome || ""));
+  for (const pid of parcoIds) {
+    const grp = perParco[pid];
+    newPage();
+
+    // ─── Header parco ─────────────────────────────
+    setT(22, true, C.text);
+    txt(grp.parco?.nome || "Parco", M, y + 16);
+    setT(9, false, C.muted);
+    const subTxt = grp.righe.length + (grp.righe.length === 1 ? " gioco ispezionato" : " giochi ispezionati");
+    txt(subTxt, M, y + 32);
+    // Linea accent
+    line(M, y + 42, M + 50, y + 42, C.accent, 2.5);
+    y += 56;
+
+    // Pre-carica TUTTE le foto in parallelo (più veloce)
+    const giocoFotos = await Promise.all(grp.righe.map(r => r.gioco?.foto_url ? loadImg(r.gioco.foto_url) : Promise.resolve(null)));
+    const ncFotosArr = await Promise.all(grp.righe.map(async r => {
+      const arr = [];
+      for (const f of r.foto_non_conformita || []) {
+        const img = await loadImg(f.foto_url);
+        if (img) arr.push({
+          img,
+          caption: f.caption || ""
+        });
+      }
+      return arr;
+    }));
+    let gIdx = 0;
+    for (const r of grp.righe) {
+      const isFail = r.stato_calc === "fail";
+      const isWarn = r.stato_calc === "warning";
+      const pillBg = isFail ? C.failBg : isWarn ? C.warnBg : C.passBg;
+      const pillFg = isFail ? C.fail : isWarn ? C.warn : C.pass;
+      const pillTxt = isFail ? "NON CONFORME" : isWarn ? "DA MONITORARE" : "CONFORME";
+      const pillSym = isFail ? "✗" : isWarn ? "!" : "✓";
+      const fotoGioco = giocoFotos[gIdx];
+      const fotoNCs = ncFotosArr[gIdx];
+      gIdx++;
+
+      // ─── LAYOUT VERTICALE FULL-WIDTH (come app) ─
+      const padding = 16;
+      const innerW = CW - 2 * padding;
+
+      // Header alto: pill + nome + sub (in colonna, 50pt)
+      const headerH = 76;
+
+      // Checklist righe visibili
+      const cklRows = checklist.filter(d => {
+        const v = r.risposte?.[d.id];
+        return v !== undefined && v !== null && v !== "";
+      });
+      const cklRowsBoolCount = cklRows.filter(d => d.tipo !== "text").length;
+      const cklRowsTextArr = cklRows.filter(d => d.tipo === "text");
+      // bodyH: solo righe bool/multi nel layout 2 colonne
+      const estimatedBodyH = Math.max(cklRowsBoolCount * 22 + 4, 140);
+      // Stima spazio per righe testo (sotto al body)
+      const textRowsH = cklRowsTextArr.reduce((acc, d) => {
+        const v = r.risposte?.[d.id];
+        if (!v) return acc;
+        const lines = Math.ceil(String(v).length / 70); // ~70 chars per riga
+        return acc + 10 + 12 + (lines * 13 + 10) + 6;
+      }, cklRowsTextArr.length > 0 ? 4 : 0);
+
+      // Foto NC: griglia 4 colonne, caption sotto
+      const hasNC = fotoNCs.length > 0;
+      // Larghezza colonna FISSA = come se fossero 4 foto per riga,
+      // anche se ce n'è solo una. Così la singola foto non si espande.
+      const ncCols = 4;
+      const ncGap = 8;
+      const ncColW = hasNC ? (innerW - (ncCols - 1) * ncGap) / ncCols : 0;
+      let ncRowH = 0;
+      if (hasNC) {
+        const targetH = 80;
+        const fits = fotoNCs.map(f => fitImage(f.img, ncColW, targetH));
+        ncRowH = Math.max(...fits.map(x => x.h)) + 18;
+      }
+      const ncRowsCount = hasNC ? Math.ceil(fotoNCs.length / ncCols) : 0;
+      // +28 = titolo sezione + spazio; ogni riga foto ha label sopra (14pt)
+      const ncH = hasNC ? 28 + ncRowsCount * (ncRowH + 14) : 0;
+      const cardH = padding + headerH + estimatedBodyH + 8 + textRowsH + ncH + padding;
+
+      // Salto pagina
+      if (y + cardH + 20 > H - 50) newPage();
+
+      // ─── Disegna card ────────────────────────
+      rect(M, y, CW, cardH, C.surface, 14);
+      stroke(M, y, CW, cardH, C.border, 0.6, 14);
+      rect(M, y, 4, cardH, pillFg, null); // accent border sx
+
+      const cardLeft = M + padding;
+      let iy = y + padding;
+
+      // ─── HEADER ──────────────────────────────
+      setT(7.5, true);
+      const pillStrW = pdf.getStringUnitWidth(pillTxt) * 7.5 / pdf.internal.scaleFactor;
+      const pillFullW = pillStrW + 30; // 30 = padding sx + simbolo vettoriale + gap
+      rect(cardLeft, iy, pillFullW, 16, pillBg, 8);
+      // Disegna simbolo a vettori (no font unicode)
+      if (isFail) drawCross(cardLeft + 7, iy + 8, 9, pillFg);else if (isWarn) {
+        setT(11, true, pillFg);
+        txt("!", cardLeft + 10, iy + 12);
+      } else drawCheck(cardLeft + 7, iy + 8, 9, pillFg);
+      setT(7.5, true, pillFg);
+      txt(pillTxt, cardLeft + 22, iy + 11);
+      iy += 32; // più aria sotto la pill
+
+      // Nome gioco grande
+      setT(17, true, C.text);
+      const nomeLines = pdf.splitTextToSize(r.gioco?.nome || "—", innerW);
+      txt(nomeLines[0] + (nomeLines.length > 1 ? "…" : ""), cardLeft, iy + 4);
+      iy += 22;
+
+      // Sub: tipo · codice
+      setT(9.5, false, C.muted);
+      const sub = [r.gioco?.tipo, r.gioco?.codice].filter(Boolean).join("  ·  ");
+      if (sub) txt(sub, cardLeft, iy + 4);
+      iy += 14;
+
+      // ─── LAYOUT 2 COLONNE: foto SX (45%) + checklist DX (55%) ───
+      const photoColW = Math.floor(innerW * 0.45);
+      const gapCols = 14;
+      const cklColW = innerW - photoColW - gapCols;
+      const cklRowH = 22;
+      const bodyH = Math.max(cklRows.length * cklRowH + 4, 140);
+      // Ricalcola fotoSize entro photoColW × bodyH
+      const fotoSize2 = fitImage(fotoGioco, photoColW - 12, bodyH - 12);
+      const bodyTopY = iy;
+
+      // BOX FOTO SX (sempre presente)
+      rect(cardLeft, bodyTopY, photoColW, bodyH, C.surfaceAlt, 8);
+      if (fotoGioco) {
+        try {
+          const fx = cardLeft + (photoColW - fotoSize2.w) / 2;
+          const fy = bodyTopY + (bodyH - fotoSize2.h) / 2;
+          pdf.addImage(fotoGioco.dataUrl, "JPEG", fx, fy, fotoSize2.w, fotoSize2.h, undefined, "MEDIUM");
+        } catch (e) {
+          if (DEBUG_MODE) console.warn("Foto skip:", e);
+        }
+      } else {
+        setT(9.5, false, C.muted);
+        const msg = "Foto non presente";
+        const msgW = pdf.getStringUnitWidth(msg) * 9.5 / pdf.internal.scaleFactor;
+        txt(msg, cardLeft + (photoColW - msgW) / 2, bodyTopY + bodyH / 2 + 3);
+      }
+
+      // CHECKLIST colonna destra — solo righe bool/multi
+      const cklX = cardLeft + photoColW + gapCols;
+      let cklIy = bodyTopY;
+      const cklRowsBool = cklRows.filter(d => db.checklist.find(c => c.id === d.id)?.tipo !== "text");
+      const cklRowsText = cklRows.filter(d => db.checklist.find(c => c.id === d.id)?.tipo === "text");
+      for (const dom of cklRowsBool) {
+        const risp = r.risposte?.[dom.id];
+        const isBool = typeof risp === "boolean";
+        const isNeg = isBool && !risp || risp === "Scarso" || risp === "Accettabile";
+        const dispText = isBool ? risp ? "Conforme" : "Non conforme" : String(risp);
+        const color = isNeg ? C.fail : C.pass;
+        line(cklX, cklIy + cklRowH - 2, cklX + cklColW, cklIy + cklRowH - 2, C.border, 0.4, [1.2, 1.5]);
+        setT(9.5, true);
+        const textW = pdf.getStringUnitWidth(dispText) * 9.5 / pdf.internal.scaleFactor;
+        const symW = isBool ? 10 : 0;
+        const gapIcn = isBool ? 4 : 0;
+        const totalRightW = textW + symW + gapIcn;
+        const rightEndX = cklX + cklColW;
+        const textStartX = rightEndX - textW;
+        const iconCX = textStartX - symW - 2;
+        const domLines = pdf.splitTextToSize(dom.domanda, cklColW - totalRightW - 8);
+        setT(8.5, false, C.muted);
+        txt(domLines[0] + (domLines.length > 1 ? "…" : ""), cklX, cklIy + 13);
+        if (isBool) {
+          if (risp) drawCheck(iconCX, cklIy + 11, 8, color);else drawCross(iconCX, cklIy + 11, 8, color);
+        }
+        setT(9.5, true, color);
+        txt(dispText, textStartX, cklIy + 13);
+        cklIy += cklRowH;
+      }
+
+      // Avanza y oltre il body
+      iy = bodyTopY + bodyH + 8;
+
+      // DOMANDE TESTO — full width sotto il body (a capo automatico)
+      if (cklRowsText.length > 0) {
+        iy += 4;
+        for (const dom of cklRowsText) {
+          const risp = r.risposte?.[dom.id];
+          if (!risp) continue;
+          // Riga domanda
+          line(cardLeft, iy, cardLeft + innerW, iy, C.border, 0.4, [1.2, 1.5]);
+          iy += 10;
+          setT(8.5, true, C.muted);
+          txt(dom.domanda, cardLeft, iy);
+          iy += 12;
+          // Testo risposta con a capo automatico
+          const textLines = pdf.splitTextToSize(String(risp), innerW - 8);
+          const textBlockH = textLines.length * 13 + 10;
+          rect(cardLeft, iy, innerW, textBlockH, C.surfaceAlt, 6);
+          setT(9.5, false, C.text);
+          txt(textLines, cardLeft + 8, iy + 11);
+          iy += textBlockH + 6;
+        }
+      }
+
+      // ─── FOTO NC ─────────────────────────────
+      if (hasNC) {
+        iy += 10;
+
+        // Titolo sezione con conteggio
+        line(cardLeft, iy, cardLeft + innerW, iy, C.border, 0.4, [1.2, 1.5]);
+        setT(8, true, C.fail);
+        txt("NON CONFORMITÀ RISCONTRATE · " + fotoNCs.length + (fotoNCs.length === 1 ? " foto" : " foto"), cardLeft, iy + 12);
+        iy += 18;
+        for (let i = 0; i < fotoNCs.length; i++) {
+          const col = i % ncCols;
+          const row = Math.floor(i / ncCols);
+          const fx = cardLeft + col * (ncColW + ncGap);
+          // Aggiungo 12pt di spazio extra per l'etichetta sopra ogni foto
+          const labelH = 14;
+          const fy = iy + row * (ncRowH + labelH) + labelH;
+          const f = fotoNCs[i];
+          const fit = fitImage(f.img, ncColW, 80);
+
+          // Etichetta "Non conformità A/B/C..."
+          const letter = String.fromCharCode(65 + i); // A, B, C, ...
+          setT(7.5, true, C.fail);
+          txt("NON CONFORMITÀ " + letter, fx, fy - 4);
+          try {
+            rect(fx, fy, ncColW, fit.h, C.surfaceAlt, 6);
+            const ix = fx + (ncColW - fit.w) / 2;
+            pdf.addImage(f.img.dataUrl, "JPEG", ix, fy, fit.w, fit.h, undefined, "MEDIUM");
+          } catch (e) {
+            console.warn(e);
+          }
+          if (f.caption) {
+            rect(fx, fy + fit.h + 2, ncColW, 14, C.failBg, 0);
+            setT(6.5, true, C.fail);
+            const capLines = pdf.splitTextToSize(f.caption, ncColW - 6);
+            txt(capLines[0], fx + 4, fy + fit.h + 11);
+          }
+        }
+      }
+      y = y + cardH + 14;
+    }
+  }
+  writeFooter();
+  const fname = "Parkly_" + (data.ispezione.comune?.nome || "report").replace(/[^a-zA-Z0-9]+/g, "_") + "_" + (data.ispezione.data || "report") + ".pdf";
+  return {
+    pdf,
+    fname
+  };
+};
 const ReportDettaglio = ({
   db,
   ispezione,
@@ -6139,19 +6672,8 @@ const ReportDettaglio = ({
       const {
         data: igs
       } = await sb.from("ispezioni_giochi").select("id, foto_non_conformita(foto_url)").eq("ispezione_id", ispezione.id);
-      const paths = [];
-      (igs || []).forEach(ig => (ig.foto_non_conformita || []).forEach(f => {
-        try {
-          const u = new URL(f.foto_url);
-          const idx = u.pathname.indexOf("/parkly-foto/");
-          if (idx >= 0) paths.push(decodeURIComponent(u.pathname.slice(idx + "/parkly-foto/".length)));
-        } catch (_) {}
-      }));
-      if (paths.length > 0) {
-        try {
-          await sb.storage.from("parkly-foto").remove(paths);
-        } catch (_) {}
-      }
+      const urls = (igs || []).flatMap(ig => (ig.foto_non_conformita || []).map(f => f.foto_url));
+      await deleteFoto(urls);
       // Cascade: ispezioni_giochi e foto_non_conformita si cancellano grazie a ON DELETE CASCADE
       const {
         error
@@ -6211,526 +6733,13 @@ const ReportDettaglio = ({
     setGenerating(true);
     try {
       const {
-        jsPDF
-      } = window.jspdf;
-      const pdf = new jsPDF({
-        unit: "pt",
-        format: "a4"
-      });
-      const W = pdf.internal.pageSize.getWidth();
-      const H = pdf.internal.pageSize.getHeight();
-      const M = 40;
-      const CW = W - 2 * M;
-      let y = M;
-      let pageNum = 1;
-
-      // ── Helpers ──────────────────────────────────────
-      const loadImg = async url => {
-        try {
-          const blob = await fetch(url).then(r => r.blob());
-          const dataUrl = await new Promise((res, rej) => {
-            const fr = new FileReader();
-            fr.onload = () => res(fr.result);
-            fr.onerror = rej;
-            fr.readAsDataURL(blob);
-          });
-          return await new Promise(res => {
-            const img = new window.Image();
-            img.onload = () => res({
-              dataUrl,
-              w: img.naturalWidth || 800,
-              h: img.naturalHeight || 600
-            });
-            img.onerror = () => res({
-              dataUrl,
-              w: 800,
-              h: 600
-            });
-            img.src = dataUrl;
-          });
-        } catch (e) {
-          return null;
-        }
-      };
-      const fitImage = (img, maxW, maxH) => {
-        if (!img) return {
-          w: 0,
-          h: 0
-        };
-        const r = img.w / img.h;
-        let w = maxW,
-          h = maxW / r;
-        if (h > maxH) {
-          h = maxH;
-          w = maxH * r;
-        }
-        return {
-          w,
-          h
-        };
-      };
-      const txt = (s, x, yy, opts) => pdf.text(s, x, yy, opts);
-      const setT = (size, bold, rgb) => {
-        pdf.setFont("helvetica", bold ? "bold" : "normal");
-        pdf.setFontSize(size);
-        if (rgb) pdf.setTextColor(rgb[0], rgb[1], rgb[2]);
-      };
-      const rect = (x, yy, w, h, rgb, radius) => {
-        pdf.setFillColor(rgb[0], rgb[1], rgb[2]);
-        if (radius != null) pdf.roundedRect(x, yy, w, h, radius, radius, "F");else pdf.rect(x, yy, w, h, "F");
-      };
-      const stroke = (x, yy, w, h, rgb, lw, radius) => {
-        pdf.setDrawColor(rgb[0], rgb[1], rgb[2]);
-        pdf.setLineWidth(lw || 0.5);
-        if (radius != null) pdf.roundedRect(x, yy, w, h, radius, radius, "S");else pdf.rect(x, yy, w, h, "S");
-      };
-      const line = (x1, y1, x2, y2, rgb, lw, dash) => {
-        pdf.setDrawColor(rgb[0], rgb[1], rgb[2]);
-        pdf.setLineWidth(lw || 0.5);
-        if (dash) pdf.setLineDash(dash);
-        pdf.line(x1, y1, x2, y2);
-        if (dash) pdf.setLineDash([]);
-      };
-      // Disegna check ✓ a vettori centrato in (cx, cy)
-      const drawCheck = (cx, cy, size, rgb) => {
-        pdf.setDrawColor(rgb[0], rgb[1], rgb[2]);
-        pdf.setLineWidth(Math.max(1.1, size * 0.20));
-        pdf.setLineCap("round");
-        pdf.setLineJoin("round");
-        const s = size;
-        // Primo tratto: dal punto basso sinistra al vertice (basso)
-        pdf.line(cx + s * 0.10, cy - s * 0.05, cx + s * 0.38, cy + s * 0.22);
-        // Secondo tratto: dal vertice in alto a destra
-        pdf.line(cx + s * 0.38, cy + s * 0.22, cx + s * 0.92, cy - s * 0.35);
-        pdf.setLineCap("butt");
-        pdf.setLineJoin("miter");
-      };
-      // Disegna X a vettori centrata in (cx, cy)
-      const drawCross = (cx, cy, size, rgb) => {
-        pdf.setDrawColor(rgb[0], rgb[1], rgb[2]);
-        pdf.setLineWidth(Math.max(1.1, size * 0.20));
-        pdf.setLineCap("round");
-        const s = size;
-        pdf.line(cx + s * 0.15, cy - s * 0.32, cx + s * 0.82, cy + s * 0.32);
-        pdf.line(cx + s * 0.82, cy - s * 0.32, cx + s * 0.15, cy + s * 0.32);
-        pdf.setLineCap("butt");
-      };
-
-      // ── Palette ──────────────────────────────────────
-      const C = {
-        dark: [43, 58, 54],
-        text: [43, 42, 38],
-        muted: [110, 106, 94],
-        border: [217, 207, 184],
-        surface: [251, 247, 238],
-        surfaceAlt: [234, 223, 200],
-        bg: [244, 238, 224],
-        accent: [196, 107, 63],
-        pass: [92, 122, 111],
-        passBg: [215, 221, 201],
-        warn: [201, 148, 58],
-        warnBg: [243, 226, 183],
-        fail: [176, 67, 43],
-        failBg: [240, 207, 194]
-      };
-
-      // ── Footer / Pagina ──────────────────────────────
-      const writeFooter = () => {
-        setT(7.5, false, C.muted);
-        txt("Parkly · Report di ispezione parchi gioco", M, H - 24);
-        txt("Pagina " + pageNum, W - M, H - 24, {
-          align: "right"
-        });
-        line(M, H - 36, W - M, H - 36, C.border, 0.4);
-      };
-      const newPage = () => {
-        writeFooter();
-        pdf.addPage();
-        pageNum++;
-        y = M;
-      };
-
-      // ═════════════════════════════════════════════════
-      // PAGINA 1 — COPERTINA
-      // ═════════════════════════════════════════════════
-      rect(0, 0, W, 220, C.dark);
-      // Decorativi
-      pdf.setFillColor(196, 107, 63);
-      pdf.circle(W - 56, 56, 78, "F");
-      pdf.setFillColor(212, 145, 95);
-      pdf.circle(W - 110, 150, 32, "F");
-      pdf.setFillColor(C.dark[0], C.dark[1], C.dark[2]);
-      pdf.circle(W - 105, 50, 18, "F");
-      setT(42, true, [244, 238, 224]);
-      txt("Parkly", M, 92);
-      setT(11, false, [217, 207, 184]);
-      txt("Report di ispezione parchi gioco", M, 112);
-      setT(9, false, [180, 170, 150]);
-      txt("Conforme allo standard UNI EN 1176", M, 128);
-
-      // Card riepilogo (sovrapposta al hero)
-      const cY = 178,
-        cH = 130;
-      rect(M, cY, CW, cH, C.surface, 14);
-      stroke(M, cY, CW, cH, C.border, 0.8, 14);
-      setT(20, true, C.text);
-      txt(data.ispezione.comune?.nome || "—", M + 22, cY + 32);
-
-      // Pill verde (auto-width sul testo)
-      const pillStr = "ISPEZIONE COMPLETATA";
-      setT(7.5, true);
-      const pillW = pdf.getStringUnitWidth(pillStr) * 7.5 / pdf.internal.scaleFactor + 24;
-      rect(M + 22, cY + 42, pillW, 16, C.passBg, 8);
-      setT(7.5, true, C.pass);
-      txt(pillStr, M + 34, cY + 53);
-      // checkmark
-      pdf.setDrawColor(C.pass[0], C.pass[1], C.pass[2]);
-      pdf.setLineWidth(1.2);
-      pdf.line(M + 26, cY + 50.5, M + 28.5, cY + 53);
-      pdf.line(M + 28.5, cY + 53, M + 32, cY + 48.5);
-
-      // Info griglia: 3 colonne
-      const infoY = cY + 86;
-      const infoLabels = ["DATA ISPEZIONE", "TECNICO INCARICATO", "GENERATO IL"];
-      const infoValues = [formatDate(data.ispezione.data) || "—", data.ispezione.ispettore?.nome || "—", formatDate(new Date())];
-      const colW = (CW - 44) / 3;
-      infoLabels.forEach((lbl, i) => {
-        const x = M + 22 + i * colW;
-        setT(7.5, true, C.muted);
-        txt(lbl, x, infoY);
-        setT(11, true, C.text);
-        const v = infoValues[i];
-        txt(v.length > 26 ? v.slice(0, 24) + "…" : v, x, infoY + 16);
-      });
-
-      // Riepilogo numerico
-      y = cY + cH + 32;
-      setT(15, true, C.text);
-      txt("Riepilogo ispezione", M, y);
-      // Sottolineatura corta sotto il titolo
-      line(M, y + 5, M + 56, y + 5, C.accent, 2);
-      y += 22;
-      const tot = data.righe.length;
-      const conf = data.righe.filter(r => r.stato_calc === "pass").length;
-      const warn = data.righe.filter(r => r.stato_calc === "warning").length;
-      const ko = data.righe.filter(r => r.stato_calc === "fail").length;
-      const stats = [{
-        label: "TOTALE GIOCHI",
-        val: tot,
-        bg: C.surfaceAlt,
-        fg: C.text,
-        fgVal: C.dark
-      }, {
-        label: "CONFORMI",
-        val: conf,
-        bg: C.passBg,
-        fg: C.pass,
-        fgVal: C.pass
-      }, {
-        label: "DA MONITORARE",
-        val: warn,
-        bg: C.warnBg,
-        fg: C.warn,
-        fgVal: C.warn
-      }, {
-        label: "NON CONFORMI",
-        val: ko,
-        bg: C.failBg,
-        fg: C.fail,
-        fgVal: C.fail
-      }];
-      const swc = (CW - 24) / 4;
-      stats.forEach((s, i) => {
-        const x = M + i * (swc + 8);
-        rect(x, y, swc, 82, s.bg, 12);
-        setT(32, true, s.fgVal);
-        txt(String(s.val), x + 14, y + 44);
-        setT(7.5, true, s.fg);
-        txt(s.label, x + 14, y + 64);
-      });
-      y += 82 + 26;
-
-      // Note finali
-      if (data.ispezione.note_finali) {
-        if (y + 80 > H - 60) newPage();
-        setT(13, true, C.text);
-        txt("Note finali", M, y);
-        line(M, y + 4, M + 38, y + 4, C.accent, 2);
-        y += 16;
-        const lines = pdf.splitTextToSize(data.ispezione.note_finali, CW - 24);
-        const nh = lines.length * 14 + 22;
-        rect(M, y, CW, nh, C.surfaceAlt, 10);
-        setT(10, false, C.text);
-        txt(lines, M + 14, y + 18);
-        y += nh + 14;
-      }
-
-      // ═════════════════════════════════════════════════
-      // PAGINE GIOCHI — Layout magazine, 2+ per pagina
-      // ═════════════════════════════════════════════════
-      const perParco = {};
-      data.righe.forEach(r => {
-        const pid = r.gioco?.parco?.id || "_";
-        if (!perParco[pid]) perParco[pid] = {
-          parco: r.gioco?.parco,
-          righe: []
-        };
-        perParco[pid].righe.push(r);
-      });
-      const checklist = (db.checklist || []).slice().sort((a, b) => a.ordine - b.ordine);
-      const parcoIds = Object.keys(perParco).sort((a, b) => (perParco[a].parco?.nome || "").localeCompare(perParco[b].parco?.nome || ""));
-      for (const pid of parcoIds) {
-        const grp = perParco[pid];
-        newPage();
-
-        // ─── Header parco ─────────────────────────────
-        setT(22, true, C.text);
-        txt(grp.parco?.nome || "Parco", M, y + 16);
-        setT(9, false, C.muted);
-        const subTxt = grp.righe.length + (grp.righe.length === 1 ? " gioco ispezionato" : " giochi ispezionati");
-        txt(subTxt, M, y + 32);
-        // Linea accent
-        line(M, y + 42, M + 50, y + 42, C.accent, 2.5);
-        y += 56;
-
-        // Pre-carica TUTTE le foto in parallelo (più veloce)
-        const giocoFotos = await Promise.all(grp.righe.map(r => r.gioco?.foto_url ? loadImg(r.gioco.foto_url) : Promise.resolve(null)));
-        const ncFotosArr = await Promise.all(grp.righe.map(async r => {
-          const arr = [];
-          for (const f of r.foto_non_conformita || []) {
-            const img = await loadImg(f.foto_url);
-            if (img) arr.push({
-              img,
-              caption: f.caption || ""
-            });
-          }
-          return arr;
-        }));
-        let gIdx = 0;
-        for (const r of grp.righe) {
-          const isFail = r.stato_calc === "fail";
-          const isWarn = r.stato_calc === "warning";
-          const pillBg = isFail ? C.failBg : isWarn ? C.warnBg : C.passBg;
-          const pillFg = isFail ? C.fail : isWarn ? C.warn : C.pass;
-          const pillTxt = isFail ? "NON CONFORME" : isWarn ? "DA MONITORARE" : "CONFORME";
-          const pillSym = isFail ? "✗" : isWarn ? "!" : "✓";
-          const fotoGioco = giocoFotos[gIdx];
-          const fotoNCs = ncFotosArr[gIdx];
-          gIdx++;
-
-          // ─── LAYOUT VERTICALE FULL-WIDTH (come app) ─
-          const padding = 16;
-          const innerW = CW - 2 * padding;
-
-          // Header alto: pill + nome + sub (in colonna, 50pt)
-          const headerH = 76;
-
-          // Checklist righe visibili
-          const cklRows = checklist.filter(d => {
-            const v = r.risposte?.[d.id];
-            return v !== undefined && v !== null && v !== "";
-          });
-          const cklRowsBoolCount = cklRows.filter(d => d.tipo !== "text").length;
-          const cklRowsTextArr = cklRows.filter(d => d.tipo === "text");
-          // bodyH: solo righe bool/multi nel layout 2 colonne
-          const estimatedBodyH = Math.max(cklRowsBoolCount * 22 + 4, 140);
-          // Stima spazio per righe testo (sotto al body)
-          const textRowsH = cklRowsTextArr.reduce((acc, d) => {
-            const v = r.risposte?.[d.id];
-            if (!v) return acc;
-            const lines = Math.ceil(String(v).length / 70); // ~70 chars per riga
-            return acc + 10 + 12 + (lines * 13 + 10) + 6;
-          }, cklRowsTextArr.length > 0 ? 4 : 0);
-          const fotoSize = {
-            w: 0,
-            h: 0
-          }; // placeholder (sostituito nella sezione disegno)
-
-          // Foto NC: griglia 4 colonne, caption sotto
-          const hasNC = fotoNCs.length > 0;
-          // Larghezza colonna FISSA = come se fossero 4 foto per riga,
-          // anche se ce n'è solo una. Così la singola foto non si espande.
-          const ncCols = 4;
-          const ncGap = 8;
-          const ncColW = hasNC ? (innerW - (ncCols - 1) * ncGap) / ncCols : 0;
-          let ncRowH = 0;
-          if (hasNC) {
-            const targetH = 80;
-            const fits = fotoNCs.map(f => fitImage(f.img, ncColW, targetH));
-            ncRowH = Math.max(...fits.map(x => x.h)) + 18;
-          }
-          const ncRowsCount = hasNC ? Math.ceil(fotoNCs.length / ncCols) : 0;
-          // +28 = titolo sezione + spazio; ogni riga foto ha label sopra (14pt)
-          const ncH = hasNC ? 28 + ncRowsCount * (ncRowH + 14) : 0;
-          const cardH = padding + headerH + estimatedBodyH + 8 + textRowsH + ncH + padding;
-
-          // Salto pagina
-          if (y + cardH + 20 > H - 50) newPage();
-
-          // ─── Disegna card ────────────────────────
-          rect(M, y, CW, cardH, C.surface, 14);
-          stroke(M, y, CW, cardH, C.border, 0.6, 14);
-          rect(M, y, 4, cardH, pillFg, null); // accent border sx
-
-          const cardLeft = M + padding;
-          let iy = y + padding;
-
-          // ─── HEADER ──────────────────────────────
-          setT(7.5, true);
-          const pillStrW = pdf.getStringUnitWidth(pillTxt) * 7.5 / pdf.internal.scaleFactor;
-          const pillFullW = pillStrW + 30; // 30 = padding sx + simbolo vettoriale + gap
-          rect(cardLeft, iy, pillFullW, 16, pillBg, 8);
-          // Disegna simbolo a vettori (no font unicode)
-          if (isFail) drawCross(cardLeft + 7, iy + 8, 9, pillFg);else if (isWarn) {
-            setT(11, true, pillFg);
-            txt("!", cardLeft + 10, iy + 12);
-          } else drawCheck(cardLeft + 7, iy + 8, 9, pillFg);
-          setT(7.5, true, pillFg);
-          txt(pillTxt, cardLeft + 22, iy + 11);
-          iy += 32; // più aria sotto la pill
-
-          // Nome gioco grande
-          setT(17, true, C.text);
-          const nomeLines = pdf.splitTextToSize(r.gioco?.nome || "—", innerW);
-          txt(nomeLines[0] + (nomeLines.length > 1 ? "…" : ""), cardLeft, iy + 4);
-          iy += 22;
-
-          // Sub: tipo · codice
-          setT(9.5, false, C.muted);
-          const sub = [r.gioco?.tipo, r.gioco?.codice].filter(Boolean).join("  ·  ");
-          if (sub) txt(sub, cardLeft, iy + 4);
-          iy += 14;
-
-          // ─── LAYOUT 2 COLONNE: foto SX (45%) + checklist DX (55%) ───
-          const photoColW = Math.floor(innerW * 0.45);
-          const gapCols = 14;
-          const cklColW = innerW - photoColW - gapCols;
-          const cklRowH = 22;
-          const bodyH = Math.max(cklRows.length * cklRowH + 4, 140);
-          // Ricalcola fotoSize entro photoColW × bodyH
-          const fotoSize2 = fitImage(fotoGioco, photoColW - 12, bodyH - 12);
-          const bodyTopY = iy;
-
-          // BOX FOTO SX (sempre presente)
-          rect(cardLeft, bodyTopY, photoColW, bodyH, C.surfaceAlt, 8);
-          if (fotoGioco) {
-            try {
-              const fx = cardLeft + (photoColW - fotoSize2.w) / 2;
-              const fy = bodyTopY + (bodyH - fotoSize2.h) / 2;
-              pdf.addImage(fotoGioco.dataUrl, "JPEG", fx, fy, fotoSize2.w, fotoSize2.h, undefined, "MEDIUM");
-            } catch (e) {
-              console.warn("Foto skip:", e);
-            }
-          } else {
-            setT(9.5, false, C.muted);
-            const msg = "Foto non presente";
-            const msgW = pdf.getStringUnitWidth(msg) * 9.5 / pdf.internal.scaleFactor;
-            txt(msg, cardLeft + (photoColW - msgW) / 2, bodyTopY + bodyH / 2 + 3);
-          }
-
-          // CHECKLIST colonna destra — solo righe bool/multi
-          const cklX = cardLeft + photoColW + gapCols;
-          let cklIy = bodyTopY;
-          const cklRowsBool = cklRows.filter(d => db.checklist.find(c => c.id === d.id)?.tipo !== "text");
-          const cklRowsText = cklRows.filter(d => db.checklist.find(c => c.id === d.id)?.tipo === "text");
-          for (const dom of cklRowsBool) {
-            const risp = r.risposte?.[dom.id];
-            const isBool = typeof risp === "boolean";
-            const isNeg = isBool && !risp || risp === "Scarso" || risp === "Accettabile";
-            const dispText = isBool ? risp ? "Conforme" : "Non conforme" : String(risp);
-            const color = isNeg ? C.fail : C.pass;
-            line(cklX, cklIy + cklRowH - 2, cklX + cklColW, cklIy + cklRowH - 2, C.border, 0.4, [1.2, 1.5]);
-            setT(9.5, true);
-            const textW = pdf.getStringUnitWidth(dispText) * 9.5 / pdf.internal.scaleFactor;
-            const symW = isBool ? 10 : 0;
-            const gapIcn = isBool ? 4 : 0;
-            const totalRightW = textW + symW + gapIcn;
-            const rightEndX = cklX + cklColW;
-            const textStartX = rightEndX - textW;
-            const iconCX = textStartX - symW - 2;
-            const domLines = pdf.splitTextToSize(dom.domanda, cklColW - totalRightW - 8);
-            setT(8.5, false, C.muted);
-            txt(domLines[0] + (domLines.length > 1 ? "…" : ""), cklX, cklIy + 13);
-            if (isBool) {
-              if (risp) drawCheck(iconCX, cklIy + 11, 8, color);else drawCross(iconCX, cklIy + 11, 8, color);
-            }
-            setT(9.5, true, color);
-            txt(dispText, textStartX, cklIy + 13);
-            cklIy += cklRowH;
-          }
-
-          // Avanza y oltre il body
-          iy = bodyTopY + bodyH + 8;
-
-          // DOMANDE TESTO — full width sotto il body (a capo automatico)
-          if (cklRowsText.length > 0) {
-            iy += 4;
-            for (const dom of cklRowsText) {
-              const risp = r.risposte?.[dom.id];
-              if (!risp) continue;
-              // Riga domanda
-              line(cardLeft, iy, cardLeft + innerW, iy, C.border, 0.4, [1.2, 1.5]);
-              iy += 10;
-              setT(8.5, true, C.muted);
-              txt(dom.domanda, cardLeft, iy);
-              iy += 12;
-              // Testo risposta con a capo automatico
-              const textLines = pdf.splitTextToSize(String(risp), innerW - 8);
-              const textBlockH = textLines.length * 13 + 10;
-              rect(cardLeft, iy, innerW, textBlockH, C.surfaceAlt, 6);
-              setT(9.5, false, C.text);
-              txt(textLines, cardLeft + 8, iy + 11);
-              iy += textBlockH + 6;
-            }
-          }
-
-          // ─── FOTO NC ─────────────────────────────
-          if (hasNC) {
-            iy += 10;
-
-            // Titolo sezione con conteggio
-            line(cardLeft, iy, cardLeft + innerW, iy, C.border, 0.4, [1.2, 1.5]);
-            setT(8, true, C.fail);
-            txt("NON CONFORMITÀ RISCONTRATE · " + fotoNCs.length + (fotoNCs.length === 1 ? " foto" : " foto"), cardLeft, iy + 12);
-            iy += 18;
-            for (let i = 0; i < fotoNCs.length; i++) {
-              const col = i % ncCols;
-              const row = Math.floor(i / ncCols);
-              const fx = cardLeft + col * (ncColW + ncGap);
-              // Aggiungo 12pt di spazio extra per l'etichetta sopra ogni foto
-              const labelH = 14;
-              const fy = iy + row * (ncRowH + labelH) + labelH;
-              const f = fotoNCs[i];
-              const fit = fitImage(f.img, ncColW, 80);
-
-              // Etichetta "Non conformità A/B/C..."
-              const letter = String.fromCharCode(65 + i); // A, B, C, ...
-              setT(7.5, true, C.fail);
-              txt("NON CONFORMITÀ " + letter, fx, fy - 4);
-              try {
-                rect(fx, fy, ncColW, fit.h, C.surfaceAlt, 6);
-                const ix = fx + (ncColW - fit.w) / 2;
-                pdf.addImage(f.img.dataUrl, "JPEG", ix, fy, fit.w, fit.h, undefined, "MEDIUM");
-              } catch (e) {
-                console.warn(e);
-              }
-              if (f.caption) {
-                rect(fx, fy + fit.h + 2, ncColW, 14, C.failBg, 0);
-                setT(6.5, true, C.fail);
-                const capLines = pdf.splitTextToSize(f.caption, ncColW - 6);
-                txt(capLines[0], fx + 4, fy + fit.h + 11);
-              }
-            }
-          }
-          y = y + cardH + 14;
-        }
-      }
-      writeFooter();
-      const fname = "Parkly_" + (data.ispezione.comune?.nome || "report").replace(/[^a-zA-Z0-9]+/g, "_") + "_" + (data.ispezione.data || "report") + ".pdf";
+        pdf,
+        fname
+      } = await buildReportPDF(data, db);
       pdf.save(fname);
       showToast("PDF generato", "success");
     } catch (e) {
-      console.error("PDF error:", e);
+      console.error("[Parkly] PDF:", e);
       showToast("Errore PDF: " + e.message, "error");
     } finally {
       setGenerating(false);
@@ -6939,7 +6948,7 @@ const ReportDettaglio = ({
       color: T.textMuted,
       marginBottom: 8
     }
-  }, r.gioco?.tipo, " \xB7 ", r.gioco?.codice), r.gioco?.foto_url && /*#__PURE__*/React.createElement("div", {
+  }, r.gioco?.tipo, " · ", r.gioco?.codice), r.gioco?.foto_url && /*#__PURE__*/React.createElement("div", {
     onClick: () => showImage(r.gioco.foto_url),
     style: {
       marginBottom: 10,
@@ -7084,7 +7093,7 @@ const ReportDettaglio = ({
       fontSize: 14,
       color: T.text
     }
-  }, "Verranno eliminate tutte le risposte, le foto delle non conformit\xE0 e il record di ispezione. Il comune torner\xE0 nella lista delle ispezioni da fare per il mese corrente. L'operazione \xE8 irreversibile.")));
+  }, "Verranno eliminate tutte le risposte, le foto delle non conformità e il record di ispezione. Il comune tornerà nella lista delle ispezioni da fare per il mese corrente. L'operazione è irreversibile.")));
 };
 
 /* ══════════════════════════════════════════════════════
@@ -7262,7 +7271,12 @@ const GestioneUtenti = ({
     title: "Utente creato",
     primaryLabel: "Copia credenziali",
     onPrimary: () => {
-      navigator.clipboard.writeText(`Parkly — credenziali di accesso\n\nEmail: ${showLink.email}\nPassword temporanea: ${showLink.password}\n\nCambia password al primo accesso.`);
+      navigator.clipboard.writeText(`Parkly — credenziali di accesso
+
+Email: ${showLink.email}
+Password temporanea: ${showLink.password}
+
+Cambia password al primo accesso.`);
       showToast("Credenziali copiate", "success");
       setShowLink(null);
     }
@@ -7286,7 +7300,7 @@ const GestioneUtenti = ({
       color: T.textMuted,
       marginTop: 8
     }
-  }, "L'utente potr\xE0 cambiare la password dopo il primo accesso."))));
+  }, "L'utente potrà cambiare la password dopo il primo accesso."))));
 };
 const UtenteForm = ({
   utente,
@@ -7433,7 +7447,7 @@ const UtenteForm = ({
       ...f,
       comune_id: v
     })),
-    placeholder: "Seleziona\u2026",
+    placeholder: "Seleziona…",
     options: comuni.map(c => ({
       value: c.id,
       label: c.nome
@@ -7490,7 +7504,7 @@ const AssegnazioneComuni = ({
   if (!assegnati) return /*#__PURE__*/React.createElement(Modal, {
     open: true,
     onClose: onClose,
-    title: "Carico\u2026"
+    title: "Carico…"
   }, /*#__PURE__*/React.createElement(Spinner, null));
   return /*#__PURE__*/React.createElement(Modal, {
     open: true,
@@ -7639,7 +7653,7 @@ const Impostazioni = ({
       cursor: "pointer",
       color: T.text
     }
-  }, "\u270E"), /*#__PURE__*/React.createElement("button", {
+  }, "✎"), /*#__PURE__*/React.createElement("button", {
     onClick: () => elimina(d),
     style: {
       background: T.failBg,
@@ -7651,7 +7665,7 @@ const Impostazioni = ({
       cursor: "pointer",
       color: T.failColor
     }
-  }, "\xD7"))))), /*#__PURE__*/React.createElement(FAB, {
+  }, "×"))))), /*#__PURE__*/React.createElement(FAB, {
     onClick: () => setShowForm({
       ordine: checklist.length + 1
     }),
@@ -7916,7 +7930,7 @@ const App = () => {
         color: T.textMuted,
         marginBottom: 14
       }
-    }, "Caricamento dati\u2026"), /*#__PURE__*/React.createElement("div", {
+    }, "Caricamento dati…"), /*#__PURE__*/React.createElement("div", {
       className: "spinner",
       style: {
         color: T.primary
@@ -8070,7 +8084,7 @@ const App = () => {
         db: db,
         onBack: goBack
       }) : /*#__PURE__*/React.createElement(Empty, {
-        icon: "\u26A0",
+        icon: "⚠",
         title: "Accesso negato"
       });
       break;
@@ -8080,7 +8094,7 @@ const App = () => {
         onBack: goBack,
         onRefresh: loadDb
       }) : /*#__PURE__*/React.createElement(Empty, {
-        icon: "\u26A0",
+        icon: "⚠",
         title: "Accesso negato"
       });
       break;
@@ -8160,6 +8174,7 @@ const App = () => {
 /* ══════════════════════════════════════════════════════
    DEBUG HUD — diagnostica visibile
 ═══════════════════════════════════════════════════════ */
+const DEBUG_MODE = new URLSearchParams(window.location.search).has("debug");
 const DebugHud = () => {
   const auth = useContext(AuthContext);
   const profilo = auth?.profilo;
@@ -8167,9 +8182,12 @@ const DebugHud = () => {
   const [open, setOpen] = useState(false);
   const [, setTick] = useState(0);
   useEffect(() => {
+    if (!DEBUG_MODE) return;
     const i = setInterval(() => setTick(t => t + 1), 2000);
     return () => clearInterval(i);
   }, []);
+  // Guard DOPO gli hook: mai un return condizionale prima (React error #310)
+  if (!DEBUG_MODE) return null;
   let ls = false,
     ss = false;
   try {
@@ -8241,7 +8259,7 @@ const DebugHud = () => {
       cursor: "pointer",
       fontSize: 14
     }
-  }, "\xD7")), /*#__PURE__*/React.createElement("div", null, dot(!!profilo), "profilo: ", profilo ? profilo.email : "null"), /*#__PURE__*/React.createElement("div", null, dot(!!session), "session"), /*#__PURE__*/React.createElement("div", null, dot(ls), "localStorage"), /*#__PURE__*/React.createElement("div", null, dot(ss), "sessionStorage"), /*#__PURE__*/React.createElement("div", null, dot(ck), "cookie"), /*#__PURE__*/React.createElement("hr", {
+  }, "×")), /*#__PURE__*/React.createElement("div", null, dot(!!profilo), "profilo: ", profilo ? profilo.email : "null"), /*#__PURE__*/React.createElement("div", null, dot(!!session), "session"), /*#__PURE__*/React.createElement("div", null, dot(ls), "localStorage"), /*#__PURE__*/React.createElement("div", null, dot(ss), "sessionStorage"), /*#__PURE__*/React.createElement("div", null, dot(ck), "cookie"), /*#__PURE__*/React.createElement("hr", {
     style: {
       borderColor: "rgba(255,255,255,0.15)",
       margin: "6px 0"
@@ -8252,7 +8270,7 @@ const DebugHud = () => {
       opacity: 0.7,
       marginBottom: 4
     }
-  }, "Ultimi eventi (pi\xF9 recenti in alto):"), logs.slice(-15).reverse().map((e, i) => /*#__PURE__*/React.createElement("div", {
+  }, "Ultimi eventi (più recenti in alto):"), logs.slice(-15).reverse().map((e, i) => /*#__PURE__*/React.createElement("div", {
     key: i,
     style: {
       marginBottom: 2,
@@ -8275,6 +8293,6 @@ const DebugHud = () => {
 ═══════════════════════════════════════════════════════ */
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(/*#__PURE__*/React.createElement(AuthProvider, null, /*#__PURE__*/React.createElement(App, null)));
-  </script>
+</script>
 </body>
 </html>
